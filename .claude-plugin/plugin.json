@@ -1,0 +1,13 @@
+{
+  "name": "prompt-design-review",
+  "version": "1.0.0",
+  "description": "Reviews the design of prompt assets (SKILL.md, CLAUDE.md, rules, subagent definitions, system prompts) and merges the result with Claude Code's built-in /doctor prompt-audit into one report.",
+  "author": {
+    "name": "Az LLC",
+    "url": "https://www.az-llc.com/"
+  },
+  "homepage": "https://github.com/Az-llc/prompt-design-review",
+  "repository": "https://github.com/Az-llc/prompt-design-review",
+  "license": "MIT",
+  "keywords": ["prompt", "review", "audit", "skill", "claude-md"]
+}

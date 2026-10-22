@@ -1,0 +1,37 @@
+---
+name: sample
+description: Fixture for the check.py self-test.
+license: Complete terms in LICENSE (MIT)
+---
+<!-- v1.1 (fixture): the latest-version line, which the body may keep -->
+<!-- v1.0 (fixture): an older line that belongs in the history folder -->
+
+# Sample
+
+対象のファイルを読んで、結果を表で返す。
+本番データを直接更新しない。
+- 箇条書きは使わない。
+- 詳細は `exists.md` を参照する。
+- 手順は `missing/guide.md` に従う。
+Never print secrets to the log.
+Use the cached value when it is fresh.
+This paragraph describes the context of the fixture.
+この節は背景の説明である。
+直接の比較実証は示されていない。
+「〜禁止」のような語は例として挙げる。
+- 手順の続きは 資料/無い.md に従う。
+外部への送信は禁止する。
+禁止の範囲は節ごとに異なる場合がある。
+入力の文字コードは判別できない。
+APIキーをログに載せない。
+秘密情報を入れない。
+外部への書き込みは禁止とします。
+この操作は以前は禁止だった。
+禁止するかは節ごとに決める。
+本番での使用禁止（理由: 課金が発生する）。
+同じ文を二度書くと、読み手はどちらが正しいかを迷うことになる。
+同じ文を二度書くと、読み手はどちらが正しいかを迷うことになる。
+
+```text
+do not count this line
+```
