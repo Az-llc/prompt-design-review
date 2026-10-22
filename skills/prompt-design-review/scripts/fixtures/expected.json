@@ -1,0 +1,13 @@
+{
+  "folder_scan_entries": 2,
+  "folder_scan_errors": 1,
+  "plugin_root_findings": [],
+  "strict_ignores_warnings": true,
+  "instruction_lines": 15,
+  "prohibition_lines": 8,
+  "missing_paths": ["missing/guide.md", "資料/無い.md"],
+  "duplicate_groups": 1,
+  "history_comment_lines": 2,
+  "history_over_limit": true,
+  "frontmatter_issues": ["license field names LICENSE but no LICENSE file up to root"]
+}

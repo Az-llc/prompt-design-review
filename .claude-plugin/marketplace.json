@@ -1,0 +1,15 @@
+{
+  "name": "az-llc",
+  "description": "Claude Code plugins by Az LLC",
+  "owner": {
+    "name": "Az LLC",
+    "url": "https://www.az-llc.com/"
+  },
+  "plugins": [
+    {
+      "name": "prompt-design-review",
+      "source": "./",
+      "description": "Reviews the design of prompt assets and merges the result with Claude Code's built-in /doctor prompt-audit into one report."
+    }
+  ]
+}
