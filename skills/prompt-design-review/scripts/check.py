@@ -2,11 +2,21 @@
 """Mechanical checks for prompt assets (SKILL.md, CLAUDE.md, rules, agent definitions, prompts).
 
 Usage:
-  python check.py [--warn-rules N] [--root DIR] [--strict] PATH [PATH ...]
+  python check.py [--warn-rules N] [--root DIR] [--strict] [--no-context] PATH [PATH ...]
   python check.py --self-test
 
 PATH may be a file or a directory (directories are scanned for *.md).
 stdout line 1: one JSON object. Following lines: human summary.
+Per file, rule_load adds the directive sentences of the instruction files Claude Code loads at session
+start with a working folder of the file's folder: CLAUDE.md and CLAUDE.local.md of that folder and its
+ancestors; .claude/CLAUDE.md and .claude/rules/**/*.md without `paths` of the project root (nearest
+ancestor with .git, else the file's folder); ~/.claude/CLAUDE.md and ~/.claude/rules/**/*.md without
+`paths`; the managed policy CLAUDE.md; and their @path imports (up to 4 hops, each file once). Each
+loaded_with entry has path, source (managed | user | ancestor | project | import), imported_by for
+imports, and directive_sentences or error. rule_load.not_counted lists what is left out.
+directive_candidates lists the target's counted sentences (line, text up to 160 chars) so a reader can
+confirm which are rules; the count itself is by wording only.
+--no-context leaves loaded_with empty, for CI or hooks whose machine differs from the author's.
 Exit: 0 ran (findings do not fail unless --strict), 1 --strict with findings or self-test mismatch,
 2 wrong arguments, missing PATH or unreadable --root. A file that cannot be read as UTF-8 is reported
 in its own entry ("error") and counts as a finding; the scan continues.
@@ -26,13 +36,18 @@ import tempfile
 import unicodedata
 from pathlib import Path
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
+CANDIDATE_TEXT_MAX = 160
 DEFAULT_WARN_RULES = 40
 THRESHOLD_NOTE = (
-    "Instruction lines are an estimate of the rule count, not a rule count, and the threshold is a "
-    "configurable warning, not a limit. Eliav (2026, preprint, arXiv 2607.19257) raised the rule count "
-    "from 10 to 160 on 5 models and reports that the share of responses satisfying every rule reached 0 "
-    "by N=80 for every model, format and placement."
+    "Directive sentences are an estimate of the rule count, found by wording, so some rules are missed "
+    "or miscounted. loaded_with is what Claude Code would load together with the target on this machine; "
+    "the total counts rules loaded together; the rules that must be followed in one response can be "
+    "fewer, and only a reading of each rule's stage can tell. "
+    f"The guide (default {DEFAULT_WARN_RULES}, --warn-rules) is this tool's own choice, not a value from "
+    "a study. Eliav (2026, preprint, arXiv 2607.19257) shows that compliance falls as more rules apply to "
+    "one response and that where it starts differs between models; that it also shifts with how hard the "
+    "rules are is this tool's judgment."
 )
 # Agent Skills frontmatter limits (Anthropic skill authoring docs).
 NAME_MAX = 64
@@ -49,9 +64,13 @@ HISTORY_COMMENTS_ALLOWED = 1
 
 # Directive detection. Japanese: sentence-final plain/request/obligation forms; descriptive endings excluded.
 JA_DIRECTIVE_END = re.compile(r"(?:[うくすつぬむぶぐる]|ない|こと|ください|べき|よい|限る|とする)$")
+# れます only after an a-row kana (書かれます, not 入れます) and います not after a kanji stem (not 行います,
+# 使います): those polite verbs are directives.
 JA_DESCRIPTIVE_END = re.compile(
     r"(?:である|ている|てある|がある|もある|にある|となる|になる|られる|できる|"
-    r"ではない|(?<!べき)でない|ていない|されない|られない|限らない|できない)$")
+    r"ではない|(?<!べき)でない|ていない|されない|られない|限らない|できない|"
+    r"です|でした|ません|ました|[あかがさざただなはばぱまらわ]れます|られます|できます|あります|"
+    r"(?<![一-鿿])います|なります)$")
 # The noun 禁止 ("prohibition", as in 「禁止の理由」) is not a rule; only the predicate or a sentence-final 禁止 is.
 JA_BAN_PREDICATE = r"禁止(?:する|すること|します|とする|とします|です|だ)?(?=[。！（(]|$)"
 JA_DIRECTIVE_ANY = re.compile(
@@ -85,6 +104,22 @@ NONASCII_PATH_RE = re.compile(
 EXT_RE = re.compile(r"\.[A-Za-z][A-Za-z0-9]{0,5}$")
 PLACEHOLDER_CHARS = set("<>{}*$%?|[]")
 
+# Claude Code memory docs: imports skip code spans and fenced blocks, "\ " escapes a space, a quoted
+# path is not imported, and imports nest at most four hops.
+IMPORT_MAX_HOPS = 4
+IMPORT_RE = re.compile(r"(?<![\w@])@((?:\\ |[^\s\"'])+)")
+CODE_SPAN_RE = re.compile(r"(`+)(?!`).*?(?<!`)\1(?!`)")
+IMPORT_TRAILING = ".,;:!?)]}"
+NOT_COUNTED = [
+    "auto memory (MEMORY.md)",
+    "AGENTS.md",
+    "rules with paths frontmatter (load on demand)",
+    "CLAUDE.md and rules in subfolders (load on demand)",
+    "claudeMd in managed settings",
+    "claudeMdExcludes, --setting-sources and the Project instructions setting",
+    "skills, agents and output styles",
+]
+
 
 def strip_frontmatter(lines: list[str]) -> tuple[dict | None, list[str], int, list[str]]:
     """Return (frontmatter dict or None, raw frontmatter lines, body start index, parse issues)."""
@@ -112,11 +147,15 @@ def parse_simple_yaml(raw: list[str]) -> dict:
     return data
 
 
+def is_git_root(p: Path) -> bool:
+    git = p / ".git"
+    # An empty stray .git folder is not a repository; a real one is a gitdir file or holds HEAD.
+    return git.is_file() or (git / "HEAD").exists()
+
+
 def find_root(start: Path) -> Path:
     for p in [start, *start.parents]:
-        git = p / ".git"
-        # An empty stray .git folder is not a repository; a real one is a gitdir file or holds HEAD.
-        if git.is_file() or (git / "HEAD").exists():
+        if is_git_root(p):
             return p
         # An installed plugin is a cache copy without .git; its manifest marks the root.
         if (p / ".claude-plugin" / "plugin.json").is_file():
@@ -244,10 +283,158 @@ def norm_sentence(s: str) -> str:
     return s
 
 
-def check_file(path: Path, root: Path, warn_rules: int, dup_min: int) -> dict:
+def split_sentences(line: str) -> list[str]:
+    return re.split(r"(?<=[。！？])|(?<=[.!?])\s+", plain(line))
+
+
+def count_directives(line: str) -> int:
+    return sum(1 for s in split_sentences(line) if is_instruction(s))
+
+
+def read_error(e: Exception) -> str:
+    if isinstance(e, UnicodeDecodeError):
+        return f"not UTF-8 ({e.reason} at byte {e.start})"
+    if isinstance(e, OSError):
+        return f"unreadable ({e.strerror or e})"
+    return f"{type(e).__name__}: {e}"
+
+
+def scan_instruction_file(path: Path) -> tuple[int, bool, list[str]]:
+    """Return (directive sentences in the body, frontmatter declares `paths`, raw @import paths)."""
+    lines = path.read_text(encoding="utf-8-sig").splitlines()
+    fm, _, body_start, _ = strip_frontmatter(lines)
+    n = 0
+    imports: list[str] = []
+    for _, line, kind in classify_body(lines, body_start):
+        if kind == "prose":
+            n += count_directives(line)
+        if kind not in ("code", "comment"):
+            imports.extend(m.group(1).replace("\\ ", " ")
+                           for m in IMPORT_RE.finditer(CODE_SPAN_RE.sub(" ", line)))
+    return n, fm is not None and "paths" in fm, imports
+
+
+def managed_policy_path() -> Path:
+    if sys.platform == "win32":
+        return Path(r"C:\Program Files\ClaudeCode\CLAUDE.md")
+    if sys.platform == "darwin":
+        return Path("/Library/Application Support/ClaudeCode/CLAUDE.md")
+    return Path("/etc/claude-code/CLAUDE.md")
+
+
+def resolve_import(raw: str, base_dir: Path, home: Path | None) -> Path:
+    def to_path(s: str) -> Path:
+        if home is not None and (s == "~" or s.startswith(("~/", "~\\"))):
+            return home / s[2:]
+        p = Path(s)
+        return p if p.is_absolute() else base_dir / p
+
+    path = to_path(raw)
+    trimmed = raw.rstrip(IMPORT_TRAILING)
+    if trimmed and trimmed != raw and not path.is_file():
+        return to_path(trimmed)
+    return path
+
+
+def rule_files(rules_dir: Path, source: str, out: list[dict]) -> list[Path]:
+    def onerror(e: OSError):
+        out.append({"path": e.filename or str(rules_dir), "source": source, "error": read_error(e)})
+
+    found: list[Path] = []
+    if not rules_dir.is_dir():
+        return found
+    visited: set[str] = set()
+    for dirpath, dirnames, filenames in os.walk(rules_dir, onerror=onerror, followlinks=True):
+        real = os.path.realpath(dirpath)
+        if real in visited:
+            dirnames[:] = []
+            continue
+        visited.add(real)
+        dirnames.sort()
+        found.extend(Path(dirpath) / f for f in sorted(filenames) if f.endswith(".md"))
+    return found
+
+
+def loaded_with(target: Path, home: Path | None, top: Path | None, managed: Path | None,
+                cache: dict) -> list[dict]:
+    folder = target.parent
+    chain: list[Path] = []
+    for p in [folder, *folder.parents]:
+        chain.append(p)
+        if top is not None and p == top:
+            break
+    project = next((p for p in chain if is_git_root(p)), folder)
+    seen = {target}
+    out: list[dict] = []
+
+    def add(path: Path, source: str, is_rule: bool = False, depth: int = 0, imported_by: str | None = None):
+        try:
+            if not path.is_file():
+                return
+            rp = path.resolve()
+        except (OSError, ValueError) as e:
+            out.append({"path": str(path), "source": source, "error": read_error(e)})
+            return
+        if rp in seen:
+            return
+        if rp not in cache:
+            try:
+                cache[rp] = scan_instruction_file(rp)
+            except (UnicodeDecodeError, OSError) as e:
+                cache[rp] = read_error(e)
+        v = cache[rp]
+        entry = {"path": str(rp), "source": source}
+        if imported_by:
+            entry["imported_by"] = imported_by
+        if isinstance(v, str):
+            seen.add(rp)
+            out.append({**entry, "error": v})
+            return
+        n, has_paths, imports = v
+        if is_rule and has_paths:
+            return
+        seen.add(rp)
+        out.append({**entry, "directive_sentences": n})
+        if depth < IMPORT_MAX_HOPS:
+            for raw in imports:
+                try:
+                    nxt = resolve_import(raw, path.parent, home)
+                except (OSError, ValueError):
+                    continue
+                add(nxt, "import", depth=depth + 1, imported_by=str(rp))
+
+    try:
+        own = cache.setdefault(target, scan_instruction_file(target))
+    except (UnicodeDecodeError, OSError):
+        own = None
+    if isinstance(own, tuple):
+        for raw in own[2]:
+            try:
+                add(resolve_import(raw, target.parent, home), "import", depth=1, imported_by=str(target))
+            except (OSError, ValueError):
+                continue
+    if managed is not None:
+        add(managed, "managed")
+    if home is not None:
+        add(home / ".claude" / "CLAUDE.md", "user")
+        for f in rule_files(home / ".claude" / "rules", "user", out):
+            add(f, "user", is_rule=True)
+    for p in reversed(chain):
+        add(p / "CLAUDE.md", "ancestor")
+        add(p / "CLAUDE.local.md", "ancestor")
+    add(project / ".claude" / "CLAUDE.md", "project")
+    for f in rule_files(project / ".claude" / "rules", "project", out):
+        add(f, "project", is_rule=True)
+    return out
+
+
+def check_file(path: Path, root: Path, warn_rules: int, dup_min: int,
+               context: list[dict] | None = None, context_error: str | None = None) -> dict:
     text = path.read_text(encoding="utf-8-sig")
     lines = text.splitlines()
     fm, fm_raw, body_start, fm_issues = strip_frontmatter(lines)
+    directives = 0
+    candidates: list[dict] = []
     instr, prohib = [], []
     missing, skipped = [], {}
     history = []
@@ -271,7 +458,10 @@ def check_file(path: Path, root: Path, warn_rules: int, dup_min: int) -> dict:
             instr.append(no)
         if is_prohibition(line):
             prohib.append(no)
-        for sent in re.split(r"(?<=[。！？])|(?<=[.!?])\s+", plain(line)):
+        for sent in split_sentences(line):
+            if is_instruction(sent):
+                directives += 1
+                candidates.append({"line": no, "text": sent.strip()[:CANDIDATE_TEXT_MAX]})
             key = norm_sentence(sent)
             if len(key) >= dup_min:
                 sentences.setdefault(key, []).append(no)
@@ -305,11 +495,21 @@ def check_file(path: Path, root: Path, warn_rules: int, dup_min: int) -> dict:
     elif is_skill:
         frontmatter["issues"].append("SKILL.md has no frontmatter")
 
+    context = context or []
+    context_total = sum(c.get("directive_sentences", 0) for c in context)
+    total = directives + context_total
+    rule_load = {"target": directives, "loaded_with": context, "loaded_with_total": context_total,
+                 "total": total, "over_threshold": total > warn_rules, "not_counted": NOT_COUNTED}
+    if context_error:
+        rule_load["context_error"] = context_error
     return {
         "path": str(path),
         "instruction_lines": len(instr),
+        "directive_sentences": directives,
+        "directive_candidates": candidates,
         "prohibition_lines": len(prohib),
-        "over_threshold": len(instr) > warn_rules,
+        "rule_load": rule_load,
+        "over_threshold": rule_load["over_threshold"],
         "prohibition_line_numbers": prohib,
         "missing_paths": missing,
         "skipped_paths": skipped,
@@ -346,9 +546,16 @@ def summary(results: list[dict], warn_rules: int) -> str:
         if "error" in r:
             out.append(f"  not checked: {r['error']}")
             continue
-        flag = "  WARN over threshold" if r["over_threshold"] else ""
-        out.append(f"  instruction lines {r['instruction_lines']} / threshold {warn_rules}{flag}; "
+        rl = r["rule_load"]
+        flag = "  WARN over guide" if rl["over_threshold"] else ""
+        out.append(f"  rules (directive sentences) {rl['target']}; loaded with it {rl['loaded_with_total']} "
+                   f"in {len(rl['loaded_with'])} files; total loaded {rl['total']} / guide {warn_rules}{flag}; "
                    f"prohibition lines {r['prohibition_lines']}")
+        if "context_error" in rl:
+            out.append(f"  loaded-with scan stopped: {rl['context_error']}")
+        for c in rl["loaded_with"]:
+            if "error" in c:
+                out.append(f"  loaded-with file not counted: {c['path']}: {c['error']}")
         for m in r["missing_paths"]:
             out.append(f"  unresolved path L{m['line']}: {m['path']}")
         if r["skipped_paths"]:
@@ -366,17 +573,26 @@ def summary(results: list[dict], warn_rules: int) -> str:
     return "\n".join(out)
 
 
-def run(paths: list[str], warn_rules: int, root: str | None, dup_min: int) -> list[dict]:
+def run(paths: list[str], warn_rules: int, root: str | None, dup_min: int, context: bool = True,
+        home: Path | None = None, top: Path | None = None, managed: Path | None = None) -> list[dict]:
     files = collect(paths)
+    home = Path.home() if home is None else home
+    managed = managed_policy_path() if managed is None else managed
+    cache: dict = {}
     results = []
     for f in files:
-        r = Path(root).resolve() if root else find_root(f.resolve().parent)
+        fr = f.resolve()
+        r = Path(root).resolve() if root else find_root(fr.parent)
+        ctx, ctx_err = [], None
+        if context:
+            try:
+                ctx = loaded_with(fr, home, top, managed, cache)
+            except (OSError, ValueError) as e:
+                ctx_err = read_error(e)
         try:
-            results.append(check_file(f.resolve(), r, warn_rules, dup_min))
-        except UnicodeDecodeError as e:
-            results.append({"path": str(f.resolve()), "error": f"not UTF-8 ({e.reason} at byte {e.start})"})
-        except OSError as e:
-            results.append({"path": str(f.resolve()), "error": f"unreadable ({e.strerror or e})"})
+            results.append(check_file(fr, r, warn_rules, dup_min, ctx, ctx_err))
+        except (UnicodeDecodeError, OSError) as e:
+            results.append({"path": str(fr), "error": read_error(e)})
     return results
 
 
@@ -386,7 +602,7 @@ def self_test() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         (Path(tmp) / "a-sjis.md").write_bytes("日本語".encode("shift_jis"))
         (Path(tmp) / "b-ok.md").write_text("ok\n", encoding="utf-8")
-        scan = run([tmp], DEFAULT_WARN_RULES, tmp, 20)
+        scan = run([tmp], DEFAULT_WARN_RULES, tmp, 20, context=False)
     with tempfile.TemporaryDirectory() as tmp:
         plugin = Path(tmp) / "plugin"
         skill = plugin / "skills" / "s"
@@ -398,11 +614,53 @@ def self_test() -> int:
         (skill / "SKILL.md").write_text(
             "---\nname: s\ndescription: d\nlicense: Complete terms in LICENSE (MIT)\n---\n"
             "See `CHANGELOG.md`.\n", encoding="utf-8")
-        pr = run([str(skill / "SKILL.md")], DEFAULT_WARN_RULES, None, 20)[0]
+        pr = run([str(skill / "SKILL.md")], DEFAULT_WARN_RULES, None, 20, context=False)[0]
         plugin_root_findings = [m["path"] for m in pr["missing_paths"]] + pr["frontmatter"]["issues"]
+    # The temp folder sits under the real home, so `top` must stop the ancestor walk there, and home and
+    # managed must be passed, or the real ~/.claude and policy file leak into the expected counts.
+    with tempfile.TemporaryDirectory() as tmp:
+        t = Path(tmp).resolve()
+        home = t / "home"
+        proj = t / "proj"
+        files = {
+            t / "CLAUDE.md": "Use English. Never push.\n@imp/extra.md\nSee `@imp/skip.md` for background.\n",
+            t / "imp" / "extra.md": "Always add tests.\n@../CLAUDE.md\n",
+            t / "imp" / "skip.md": "Always skip.\n",
+            t / ".claude" / "CLAUDE.md": "Never rebase.\n",
+            t / ".claude" / "rules" / "a.md": "Always run tests.\n",
+            proj / ".git": "gitdir: elsewhere\n",
+            proj / ".claude" / "CLAUDE.md": "Never deploy on Friday.\n",
+            proj / ".claude" / "rules" / "sub" / "r.md": "Always lint.\n",
+            proj / ".claude" / "rules" / "p.md": '---\npaths: ["x/**"]\n---\nAlways check x.\n',
+            proj / "sub" / "CLAUDE.local.md": "Keep logs.\n",
+            proj / "sub" / "t.txt": "hello\n",
+            home / ".claude" / "CLAUDE.md": "Keep replies short.\n",
+            home / ".claude" / "rules" / "u.md": "Always cite sources.\n",
+            t / "managed" / "CLAUDE.md": "Never share secrets.\n",
+        }
+        for p, body in files.items():
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(body, encoding="utf-8")
+        cr = run([str(proj / "sub" / "t.txt")], DEFAULT_WARN_RULES, str(proj), 20, home=home, top=t,
+                 managed=t / "managed" / "CLAUDE.md")[0]["rule_load"]
+    ja_cases = [
+        ("これはプラグインです。", False),
+        ("報告書は利用者の言語で書かれます。", False),
+        ("この設定は後から変更できます。", False),
+        ("結果は表にまとめてあります。", False),
+        ("古い版は使われていません。", False),
+        ("前回の実行は失敗しました。", False),
+        ("対象のファイルを読みます。", True),
+        ("結果を表で返してください。", True),
+        ("本番データを更新しないでください。", True),
+        ("変更の前に確認します。", True),
+        ("出力は日本語で書くこと。", True),
+        ("検証は毎回行います。", True),
+    ]
+    ja_mismatches = [s for s, want in ja_cases if is_instruction(s) != want]
     # Not SKILL.md (Claude Code would load it as a skill) and not *.md (a folder scan of this skill
     # would report the fixture's deliberate findings and fail --strict).
-    results = run([str(here / "sample-skill.txt")], DEFAULT_WARN_RULES, str(here), 20)
+    results = run([str(here / "sample-skill.txt")], DEFAULT_WARN_RULES, str(here), 20, context=False)
     r = results[0]
     got = {
         "folder_scan_entries": len(scan),
@@ -412,6 +670,11 @@ def self_test() -> int:
             {**r, "over_threshold": True, "missing_paths": [], "history_over_limit": False,
              "frontmatter": {"issues": []}}),
         "instruction_lines": r["instruction_lines"],
+        "directive_sentences": r["directive_sentences"],
+        "context_loaded_with_total": cr["loaded_with_total"],
+        "context_loaded_with_files": len(cr["loaded_with"]),
+        "context_sources": sorted(c["source"] for c in cr["loaded_with"]),
+        "ja_polite_mismatches": ja_mismatches,
         "prohibition_lines": r["prohibition_lines"],
         "missing_paths": sorted(m["path"] for m in r["missing_paths"]),
         "duplicate_groups": len(r["duplicates"]),
@@ -444,12 +707,14 @@ def main(argv: list[str]) -> int:
     ap = JsonErrorParser(description="Mechanical checks for prompt assets.")
     ap.add_argument("paths", nargs="*")
     ap.add_argument("--warn-rules", type=int, default=DEFAULT_WARN_RULES,
-                    help=f"instruction-line warning threshold (heuristic, default {DEFAULT_WARN_RULES})")
+                    help=f"guide for rule_load.total (this tool's own choice, default {DEFAULT_WARN_RULES})")
     ap.add_argument("--root", help="repository root for path resolution (default: nearest ancestor with .git or .claude-plugin/plugin.json)")
     ap.add_argument("--dup-min", type=int, default=20, help="minimum normalized sentence length for duplicates")
     ap.add_argument("--strict", action="store_true",
                     help="exit 1 on findings (over_threshold and duplicates excluded); hooks need exit 2: "
                          "python check.py --strict PATH 1>&2 || exit 2")
+    ap.add_argument("--no-context", action="store_true",
+                    help="do not add the instruction files Claude Code loads with the target (loaded_with stays empty)")
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args(argv)
     if a.self_test:
@@ -459,7 +724,7 @@ def main(argv: list[str]) -> int:
     if a.root and not Path(a.root).is_dir():
         ap.error(f"--root is not a readable folder: {a.root}")
     try:
-        results = run(a.paths, a.warn_rules, a.root, a.dup_min)
+        results = run(a.paths, a.warn_rules, a.root, a.dup_min, context=not a.no_context)
     except OSError as e:
         ap.error(f"PATH not found or unreadable: {e}")
     payload = {"tool": "check.py", "version": VERSION, "warn_rules": a.warn_rules,
