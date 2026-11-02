@@ -80,6 +80,10 @@ The target is rewritten only for the findings you select from the report. The tu
 - The built-in audit is run by `skills/prompt-design-review/scripts/run-audit.py`: from an empty temporary folder, in safe mode (`--safe-mode`), with the target's folder passed by `--add-dir`, only reading tools (so it cannot change the target or run commands, and it does not look at git history), and a time limit that stays under the Bash tool's 10 minutes. Safe mode keeps your own `~/.claude` CLAUDE.md, rules, skills and plugins, and those of the project you are working in, out of the diagnosis, so your personal rules do not color its judgment; conflicts with the CLAUDE.md files that apply to the asset are checked by this plugin's first viewpoint instead. If it fails, the report says so in plain words and marks what was not checked.
 - Python 3 (standard library only).
 
+## Without Claude Code (prompt edition)
+
+[`prompt/prompt-design-review-prompt.md`](prompt/prompt-design-review-prompt.md) is a paste-in version for any chat model (Claude, ChatGPT, Gemini and others). Copy the whole file into a chat and paste the prompt, SKILL.md or CLAUDE.md to review in the same message. It applies the same seven viewpoints with their evidence, adds checks for prompt style in place of the built-in audit (an expert role added for accuracy, emotional stakes, step-by-step instructions for thinking models, overused emphasis, a critical rule buried in the middle), and ends with the same numbered choices. It cannot run the built-in audit or check.py, cannot open referenced files, and says so in the report. The prompt edition and the plugin share one version number.
+
 ## check.py
 
 ```text
@@ -111,6 +115,7 @@ The evidence for each criterion is written in SKILL.md as short sentences whose 
 - `skills/prompt-design-review/scripts/check.py` mechanical check
 - `skills/prompt-design-review/scripts/run-audit.py` runs the built-in audit in safe mode and returns one JSON line (`status` ok / failed / not_run, `reason`, `result`, `other_denials`, `cost_usd`; exit 2 for argument errors; `--self-test` needs no network). Each real run is billed like any `claude -p` call
 - `skills/prompt-design-review/scripts/fixtures/` self-test sample and expected values (the sample is not named SKILL.md or *.md so that it is neither loaded as a skill nor picked up by folder scans)
+- `prompt/prompt-design-review-prompt.md` the prompt edition (not loaded by the plugin)
 - `docs/rule-count-experiment.md` background: a small experiment on how many rules current Claude models follow at the same time (not cited in reports)
 - `CHANGELOG.md` change summary
 

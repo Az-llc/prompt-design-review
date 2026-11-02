@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.0 (2026-11-02) — Prompt edition
+
+- New `prompt/prompt-design-review-prompt.md`: a paste-in version for any chat model. It applies the seven viewpoints with the same evidence, adds prompt-style checks in place of the built-in audit (an expert role added for accuracy, emotional stakes, step-by-step instructions for thinking models, overused emphasis, a critical rule buried in the middle; each source checked against the paper), replaces check.py with checks done by reading, and ends with the same numbered choices. The plugin does not load it. The prompt edition and the plugin share one version number from this release.
+- The enforcement-point viewpoint no longer says a hook blocks only on exit code 2: a hook also blocks with exit code 0 and a JSON decision, and a PostToolUse hook runs after the tool and cannot prevent it.
+
 ## 1.0.1 (2026-10-22) — Readable report with provenance
 
 - The report is a report document for readers who do not know the plugin's internals: an overall verdict and conclusion first, then this plugin's viewpoints (why each matters, its evidence, verdict and impact), then Claude Code's standard prompt diagnosis as a separate section that shows each of its findings with its own reason, recommended timing ("before using it", "when there is time", and "your call" for low-confidence findings, which are applied only when named), details, and a closing "next action" with numbered choices and the number of findings that would remain for each. Choice 4 shows the improved text without changing any file.

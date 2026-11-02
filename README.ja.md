@@ -80,6 +80,10 @@ claude plugin update prompt-design-review@az-llc
 - 組み込みの監査は `skills/prompt-design-review/scripts/run-audit.py` が呼びます。空の一時フォルダから、セーフモード（`--safe-mode`）で、対象のフォルダを `--add-dir` で渡し、読むためのツールだけを渡し（対象を変えられず、コマンドも実行できず、git の履歴も見ません）、Bash ツールの 10 分に収まる時間の上限を付けます。セーフモードでは、あなたの `~/.claude` の CLAUDE.md・rule・skill・プラグインも、作業中のプロジェクトの分も診断に入らないので、あなたの個人的な決まりが判定に混ざりません。その資産に効く CLAUDE.md との食い違いは、代わりにこのプラグインの一つ目の観点が見ます。失敗したときは報告書に平易な言葉でそう書き、確かめられなかった範囲を示します。
 - Python 3（標準ライブラリのみ）。
 
+## Claude Code を使わない場合（Prompt 版）
+
+[`prompt/prompt-design-review-prompt.md`](prompt/prompt-design-review-prompt.md) は、どのチャットの AI（Claude・ChatGPT・Gemini など）でも使える貼り付け用の版です（英語）。ファイルの全文をチャットに貼り、同じメッセージに見てほしいプロンプト・SKILL.md・CLAUDE.md を貼ります。七つの観点を同じ根拠で当て、組み込みの監査の代わりに書き方の点検（精度を狙った専門家の役割、感情に訴える文、考える設定のモデルへの「段階的に考えて」、強調語の多用、途中に埋もれた大事な決まり）を足し、最後は同じ番号の選択肢で終わります。組み込みの監査と check.py は動かせず、参照先のファイルも開けないので、そのことを報告書に書きます。Prompt 版とプラグインは同じ版番号を使います。
+
 ## check.py
 
 ```text
@@ -111,6 +115,7 @@ python skills/prompt-design-review/scripts/check.py --self-test
 - `skills/prompt-design-review/scripts/check.py` 機械検査
 - `skills/prompt-design-review/scripts/run-audit.py` 組み込みの監査をセーフモードで動かし、1 行の JSON（`status` ok／failed／not_run、`reason`、`result`、`other_denials`、`cost_usd`）を返す。引数の誤りは終了コード 2。`--self-test` は通信しない。実際の実行は、ほかの `claude -p` の呼び出しと同じく課金される
 - `skills/prompt-design-review/scripts/fixtures/` 自己検査の見本と期待値（見本は skill として読み込まれず、フォルダの走査にも入らないよう、SKILL.md とも *.md とも名付けていない）
+- `prompt/prompt-design-review-prompt.md` Prompt 版（プラグインは読み込まない）
 - `docs/rule-count-experiment.md` 背景資料: 今の Claude のモデルが同時に何個の決まりを守れるかを試した小さな実験（報告書では引用しない）
 - `CHANGELOG.md` 変更の要約
 
