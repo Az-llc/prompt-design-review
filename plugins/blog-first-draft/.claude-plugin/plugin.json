@@ -1,0 +1,13 @@
+{
+  "name": "blog-first-draft",
+  "version": "0.10.0",
+  "description": "Writes the first draft of a Japanese technical blog article from the records of finished work. What the writer is given is prepared before any prose: the author's remarks from the conversations of that work, a claim outline checked against the numbers, and a title the author picks. Subagents with no context write and read the draft.",
+  "author": {
+    "name": "Az LLC",
+    "url": "https://www.az-llc.com/"
+  },
+  "homepage": "https://github.com/Az-llc/prompt-design-review",
+  "repository": "https://github.com/Az-llc/prompt-design-review",
+  "license": "MIT",
+  "keywords": ["writing", "blog", "zenn", "subagents", "skill"]
+}

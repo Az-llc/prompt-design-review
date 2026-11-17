@@ -4,6 +4,8 @@
 
 [English README](README.md)
 
+このリポジトリの marketplace には、別に入れるもう 1 つのプラグイン [blog-first-draft](plugins/blog-first-draft/README.ja.md) もあります。終わった作業の記録から、日本語の技術記事の最初の版を作ります。このページの残りは prompt-design-review の説明です。
+
 ## 概要
 
 Claude Code 2.1.283 以降には、プロンプト資産の古い書き方を探す組み込みの監査があります。このプラグインはその監査を動かし、監査が見ない設計の欠けを足して、二つを並べて報告します。

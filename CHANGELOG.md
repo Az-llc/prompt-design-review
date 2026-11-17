@@ -1,5 +1,10 @@
 # Changelog
 
+## blog-first-draft 0.10.0 (2026-11-17) — Second plugin in this marketplace
+
+- New plugin `blog-first-draft` under `plugins/blog-first-draft/`, installed separately as `blog-first-draft@az-llc`. It writes the first draft of a Japanese technical blog article from the records of finished work: it collects the author's remarks from the conversation records, outlines the claims and checks them against the numbers, lets the author settle the title and the opening, has a subagent with no context write the body, and has another read it once and fix what it raised once. See `plugins/blog-first-draft/README.md`.
+- `prompt-design-review` itself is unchanged.
+
 ## 1.1.0 (2026-11-02) — Prompt edition
 
 - New `prompt/prompt-design-review-prompt.md`: a paste-in version for any chat model. It applies the seven viewpoints with the same evidence, adds prompt-style checks in place of the built-in audit (an expert role added for accuracy, emotional stakes, step-by-step instructions for thinking models, overused emphasis, a critical rule buried in the middle; each source checked against the paper), replaces check.py with checks done by reading, and ends with the same numbered choices. The plugin does not load it. The prompt edition and the plugin share one version number from this release.

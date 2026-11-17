@@ -10,6 +10,11 @@
       "name": "prompt-design-review",
       "source": "./",
       "description": "Reviews the design of prompt assets and merges the result with Claude Code's built-in /doctor prompt-audit into one report."
+    },
+    {
+      "name": "blog-first-draft",
+      "source": "./plugins/blog-first-draft",
+      "description": "Writes the first draft of a Japanese technical blog article from the records of finished work, preparing what the writer is given before any prose is written."
     }
   ]
 }
