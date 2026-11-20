@@ -4,7 +4,7 @@
 
 [English README](README.md)
 
-このリポジトリの marketplace には、別に入れるもう 1 つのプラグイン [blog-first-draft](plugins/blog-first-draft/README.ja.md) もあります。終わった作業の記録から、日本語の技術記事の最初の版を作ります。このページの残りは prompt-design-review の説明です。
+このリポジトリの marketplace には、別に入れるプラグインがほかに 2 つあります。[blog-first-draft](plugins/blog-first-draft/README.ja.md) は、終わった作業の記録から、日本語の技術記事の最初の版を作ります。[transcript-failure-scan](plugins/transcript-failure-scan/README.ja.md) は、手元の Claude Code の会話の記録から繰り返し起きている失敗を数え、直し方を Claude に提案させます。このページの残りは prompt-design-review の説明です。
 
 ## 概要
 

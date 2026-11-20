@@ -4,7 +4,7 @@ A Claude Code plugin that reviews how prompts, CLAUDE.md files and skills are wr
 
 [日本語版 README](README.ja.md)
 
-This repository's marketplace also lists a second, separately installed plugin: [blog-first-draft](plugins/blog-first-draft/README.md), which writes the first draft of a Japanese technical blog article from the records of finished work. The rest of this page is about prompt-design-review.
+This repository's marketplace also lists two more, separately installed plugins: [blog-first-draft](plugins/blog-first-draft/README.md), which writes the first draft of a Japanese technical blog article from the records of finished work, and [transcript-failure-scan](plugins/transcript-failure-scan/README.md), which counts the failures that recur across your local Claude Code conversation records and has Claude propose fixes. The rest of this page is about prompt-design-review.
 
 ## What it does
 

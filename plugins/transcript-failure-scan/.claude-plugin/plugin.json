@@ -1,0 +1,13 @@
+{
+  "name": "transcript-failure-scan",
+  "version": "0.10.0",
+  "description": "Counts the failures that recur across your local Claude Code conversation records and the hooks and instruction files you have, then has Claude analyse the counts by owner and propose mechanical fixes for you to choose from.",
+  "author": {
+    "name": "Az LLC",
+    "url": "https://www.az-llc.com/"
+  },
+  "homepage": "https://github.com/Az-llc/prompt-design-review",
+  "repository": "https://github.com/Az-llc/prompt-design-review",
+  "license": "MIT",
+  "keywords": ["hooks", "transcripts", "failures", "audit", "skill"]
+}

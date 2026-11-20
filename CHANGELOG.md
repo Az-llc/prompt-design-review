@@ -1,5 +1,11 @@
 # Changelog
 
+## transcript-failure-scan 0.10.0 (2026-11-21) — Third plugin in this marketplace
+
+- Published as a snapshot: this plugin will not be updated.
+- New plugin `transcript-failure-scan` under `plugins/transcript-failure-scan/`, installed separately as `transcript-failure-scan@az-llc`. A script counts the failures that recur across the local Claude Code conversation records and lists mechanical facts about the hook registrations and instruction files; Claude then analyses the counts by owner and proposes mechanical fixes for the user to choose from. The script is LAISORA's scan tool, shipped unchanged. See `plugins/transcript-failure-scan/README.md`.
+- `prompt-design-review` itself is unchanged.
+
 ## blog-first-draft 0.10.0 (2026-11-17) — Second plugin in this marketplace
 
 - New plugin `blog-first-draft` under `plugins/blog-first-draft/`, installed separately as `blog-first-draft@az-llc`. It writes the first draft of a Japanese technical blog article from the records of finished work: it collects the author's remarks from the conversation records, outlines the claims and checks them against the numbers, lets the author settle the title and the opening, has a subagent with no context write the body, and has another read it once and fix what it raised once. See `plugins/blog-first-draft/README.md`.
